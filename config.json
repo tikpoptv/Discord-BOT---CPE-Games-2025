@@ -1,0 +1,24 @@
+{
+    "years": [
+      "ปี 1",
+      "ปี 2",
+      "ปี 3",
+      "ปี 4"
+    ],
+    "roles": {
+      "ฝ่ายกราฟิก": ["ฝ่ายกราฟิก", "verify", "on-line", "on-site"],
+      "ฝ่ายทะเบียน": ["ฝ่ายทะเบียน", "verify", "on-line", "on-site"],
+      "ฝ่ายเทคนิค": ["ฝ่ายเทคนิค", "verify", "on-line", "on-site"],
+      "ฝ่ายบัญชี": ["ฝ่ายบัญชี", "verify", "on-line", "on-site"],
+      "ฝ่ายประชาสัมพันธ์": ["ฝ่ายประชาสัมพันธ์", "verify", "on-line", "on-site"],
+      "Game manager - main": ["Game manager - main", "verify", "on-line"],
+      "Game manager - staff": ["Game manager - staff", "verify", "on-line"],
+      "ฝ่ายกิจกรรมออนไซต์": ["ฝ่ายกิจกรรมออนไซต์", "verify", "on-site"],
+      "ฝ่ายกีฬา": ["ฝ่ายกีฬา", "verify", "on-site"],
+      "ฝ่ายพยาบาล": ["ฝ่ายพยาบาล", "verify", "on-site"],
+      "ฝ่ายสถานที่": ["ฝ่ายสถานที่", "verify", "on-site"],
+      "ฝ่ายสวัสดิการ": ["ฝ่ายสวัสดิการ", "verify", "on-site"],
+      "ฝ่ายโสตทัศนูปกรณ์": ["ฝ่ายโสตทัศนูปกรณ์", "verify", "on-site"]
+    }
+  }
+  
