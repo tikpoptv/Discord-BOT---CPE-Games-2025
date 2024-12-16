@@ -41,3 +41,7 @@ The bot is designed to be flexible and offers multiple versions to suit differen
    DISCORD_TOKEN=your-bot-token
    CLIENT_ID=your-client-id
    GUILD_ID=your-guild-id
+
+## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
