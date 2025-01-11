@@ -49,28 +49,25 @@ const processLogsInBackground = async () => {
 const deleteCommands = async () => {
     const rest = new REST({ version: '10' }).setToken(TOKEN);
     try {
-        console.log('Started deleting all global and guild application (/) commands.');
-        await logToChannel('🚨 Started deleting all global and guild application (/) commands.');
+        console.log('Deleting all global and guild commands...');
 
+        // ลบ Global Commands
         const globalCommands = await rest.get(Routes.applicationCommands(CLIENT_ID));
         for (const command of globalCommands) {
             console.log(`Deleting global command: ${command.name}`);
-            await logToChannel(`🗑️ Deleting global command: ${command.name}`);
             await rest.delete(`${Routes.applicationCommands(CLIENT_ID)}/${command.id}`);
         }
+        console.log('Deleted all global commands.');
 
+        // ลบ Guild Commands
         const guildCommands = await rest.get(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID));
         for (const command of guildCommands) {
             console.log(`Deleting guild command: ${command.name}`);
-            await logToChannel(`🗑️ Deleting guild command: ${command.name}`);
             await rest.delete(`${Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID)}/${command.id}`);
         }
-
-        console.log('Successfully deleted all application (/) commands.');
-        await logToChannel('✅ Successfully deleted all application (/) commands.');
+        console.log('Deleted all guild commands.');
     } catch (error) {
         console.error('Error deleting commands:', error);
-        await logToChannel(`❌ Error deleting commands: ${error.message}`);
     }
 };
 
@@ -80,21 +77,23 @@ const registerCommands = async () => {
             name: 'register',
             description: 'ลงทะเบียนข้อมูลส่วนตัว (ชื่อ, ชั้นปี, ตำแหน่ง)',
         },
+        {
+            name: 'gamerole',
+            description: 'เลือก Role เกมที่คุณต้องการ',
+        },
     ];
 
     const rest = new REST({ version: '10' }).setToken(TOKEN);
 
     try {
-        console.log('Started refreshing application (/) commands.');
-        await logToChannel('🔄 Started refreshing application (/) commands.');
-        await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
-        console.log('Successfully reloaded application (/) commands.');
-        await logToChannel('✅ Successfully reloaded application (/) commands.');
+        console.log('Registering Guild Commands...');
+        await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
+        console.log('Guild commands registered successfully.');
     } catch (error) {
-        console.error('Error refreshing commands:', error);
-        await logToChannel(`❌ Error refreshing commands: ${error.message}`);
+        console.error('Error registering commands:', error);
     }
 };
+
 
 client.once('ready', async () => {
     console.log(`Logged in as ${client.user.tag}!`);
@@ -158,6 +157,66 @@ const addRolesAndSetNickname = async (interaction, user, role) => {
         });
     }
 };
+
+const handleGameRoleSelection = async (interaction, selectedRole) => {
+    const gameRoles = config.gameroles; // ดึงรายชื่อเกมจาก config.json
+    const relevantRoles = interaction.member.roles.cache.filter((role) => gameRoles.includes(role.name));
+
+    if (relevantRoles.size > 0) {
+        const resetOrAddMenu = new StringSelectMenuBuilder()
+            .setCustomId('reset-or-add-gamerole')
+            .setPlaceholder('คุณต้องการรีเซ็ตหรือเพิ่ม Role ใหม่?')
+            .addOptions([
+                { label: 'รีเซ็ต Role', value: 'reset' },
+                { label: 'เพิ่ม Role ใหม่', value: 'add' },
+            ]);
+
+        const actionRowResetOrAdd = new ActionRowBuilder().addComponents(resetOrAddMenu);
+
+        await interaction.editReply({
+            content: `คุณมี Role เกมอยู่แล้ว: ${relevantRoles.map((r) => r.name).join(', ')}\nกรุณาเลือกว่าจะรีเซ็ตหรือเพิ่มใหม่:`,
+            components: [actionRowResetOrAdd],
+            ephemeral: true,
+        });
+
+        userData.set(interaction.user.id, { selectedRole, isGameRole: true });
+    } else {
+        await assignGameRole(interaction, selectedRole);
+    }
+};
+
+const assignGameRole = async (interaction, roleName) => {
+    try {
+        const guildRole = interaction.guild.roles.cache.find((r) => r.name === roleName);
+
+        if (guildRole) {
+            await interaction.member.roles.add(guildRole);
+            await interaction.editReply({
+                content: `✅ คุณได้รับ Role **${roleName}** เรียบร้อยแล้ว!`,
+                ephemeral: true,
+            });
+        } else {
+            throw new Error(`Role "${roleName}" ไม่พบในเซิร์ฟเวอร์`);
+        }
+    } catch (error) {
+        console.error('Error assigning game role:', error.message);
+        await interaction.editReply({
+            content: `❌ เกิดข้อผิดพลาด: ${error.message}`,
+            ephemeral: true,
+        });
+    }
+};
+
+const checkRegisteredCommands = async () => {
+    const rest = new REST({ version: '10' }).setToken(TOKEN);
+
+    const globalCommands = await rest.get(Routes.applicationCommands(CLIENT_ID));
+    console.log('Registered Global Commands:', globalCommands.map(cmd => cmd.name));
+
+    const guildCommands = await rest.get(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID));
+    console.log('Registered Guild Commands:', guildCommands.map(cmd => cmd.name));
+};
+
 
 client.on('interactionCreate', async (interaction) => {
     try {
@@ -316,6 +375,58 @@ client.on('interactionCreate', async (interaction) => {
 
             await addRolesAndSetNickname(interaction, user, role);
         }
+
+        if (interaction.commandName === 'gamerole') {
+            const gameRoleMenu = new StringSelectMenuBuilder()
+                .setCustomId('game-role-select')
+                .setPlaceholder('เลือกเกมของคุณ...')
+                .addOptions(
+                    config.gameroles.map((game) => ({ label: game, value: game }))
+                ); // ดึงชื่อเกมจาก config.gameroles
+
+            const actionRowGameRole = new ActionRowBuilder().addComponents(gameRoleMenu);
+
+            await interaction.reply({
+                content: 'กรุณาเลือกเกมที่คุณต้องการ:',
+                components: [actionRowGameRole],
+                ephemeral: true,
+            });
+        }
+
+        if (interaction.isStringSelectMenu() && interaction.customId === 'game-role-select') {
+            const selectedRole = interaction.values[0];
+            await interaction.deferReply({ ephemeral: true }); // เพิ่มการ defer
+            await handleGameRoleSelection(interaction, selectedRole);
+        }
+        
+        if (interaction.isStringSelectMenu() && interaction.customId === 'reset-or-add-gamerole') {
+            const user = userData.get(interaction.user.id);
+            if (!user || !user.isGameRole) {
+                await interaction.editReply({
+                    content: 'ไม่พบข้อมูลผู้ใช้ กรุณาเริ่มต้นใหม่โดยใช้คำสั่ง /gamerole',
+                    ephemeral: true,
+                });
+                return;
+            }
+        
+            await interaction.deferReply({ ephemeral: true }); // เพิ่มการ defer
+            if (interaction.values[0] === 'reset') {
+                const gameRoles = config.gameroles; // ดึงรายชื่อเกมจาก config.json
+                const rolesToRemove = interaction.member.roles.cache.filter((role) => gameRoles.includes(role.name));
+        
+                for (const role of rolesToRemove.values()) {
+                    await interaction.member.roles.remove(role);
+                }
+        
+                await interaction.editReply({
+                    content: '✅ Role เก่าถูกรีเซ็ตเรียบร้อยแล้ว!',
+                    ephemeral: true,
+                });
+            }
+        
+            await assignGameRole(interaction, user.selectedRole);
+        }
+        
     } catch (error) {
         console.error('Unhandled interaction error:', error);
         await logToChannel(`❌ Unhandled interaction error: ${error.message}`);
@@ -324,6 +435,7 @@ client.on('interactionCreate', async (interaction) => {
 
 (async () => {
     await deleteCommands();
+    await checkRegisteredCommands(); // ตรวจสอบคำสั่งใหม่
     await registerCommands();
 })();
 
