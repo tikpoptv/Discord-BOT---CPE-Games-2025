@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits, StringSelectMenuBuilder, ActionRowBuilder, REST, Routes, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const config = require('./config.json'); 
 require('dotenv').config();
+const { MessageFlags } = require('discord.js');
 
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -102,8 +103,9 @@ client.once('ready', async () => {
 
 const resetRoles = async (interaction) => {
     try {
+        const gameRoles = config.gameroles; 
         const rolesToRemove = interaction.member.roles.cache.filter(
-            (role) => role.name !== '@everyone'
+            (role) => role.name !== '@everyone' && !gameRoles.includes(role.name)
         );
 
         for (const role of rolesToRemove.values()) {
@@ -180,8 +182,10 @@ const handleGameRoleSelection = async (interaction, selectedRole) => {
         });
 
         userData.set(interaction.user.id, { selectedRole, isGameRole: true });
+        await logToChannel(`⚠️ User ${interaction.user.tag} attempted to add game role "${selectedRole}" but has existing roles: "${relevantRoles.map((r) => r.name).join(', ')}". Prompting for reset/add.`);
     } else {
         await assignGameRole(interaction, selectedRole);
+        await logToChannel(`🕹️ User ${interaction.user.tag} selected game role: "${selectedRole}".`);
     }
 };
 
@@ -191,19 +195,24 @@ const assignGameRole = async (interaction, roleName) => {
 
         if (guildRole) {
             await interaction.member.roles.add(guildRole);
+            const successMessage = `✅ คุณได้รับ Role **${roleName}** เรียบร้อยแล้ว!`;
             await interaction.editReply({
-                content: `✅ คุณได้รับ Role **${roleName}** เรียบร้อยแล้ว!`,
+                content: successMessage,
                 ephemeral: true,
             });
+            await logToChannel(`✅ User ${interaction.user.tag} was assigned the game role: "${roleName}" successfully.`);
         } else {
-            throw new Error(`Role "${roleName}" ไม่พบในเซิร์ฟเวอร์`);
+            const errorMessage = `Role "${roleName}" ไม่พบในเซิร์ฟเวอร์`;
+            throw new Error(errorMessage);
         }
     } catch (error) {
         console.error('Error assigning game role:', error.message);
+        const failMessage = `❌ เกิดข้อผิดพลาด: ${error.message}`;
         await interaction.editReply({
-            content: `❌ เกิดข้อผิดพลาด: ${error.message}`,
+            content: failMessage,
             ephemeral: true,
         });
+        await logToChannel(`❌ User ${interaction.user.tag} failed to be assigned the game role: "${roleName}". Error: ${error.message}`);
     }
 };
 
@@ -389,7 +398,7 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.reply({
                 content: 'กรุณาเลือกเกมที่คุณต้องการ:',
                 components: [actionRowGameRole],
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral, // แบบใหม่
             });
         }
 
